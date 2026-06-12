@@ -1,4 +1,4 @@
-import { addDays, collections, dateLabel, daysUntil, emptyState, escapeHtml, findName, formData, memberStatus, money, optionList, pageHeader, statusClass, today } from "./utils.js";
+import { addDays, collections, dateLabel, daysUntil, emptyState, escapeHtml, findName, formData, memberStatus, money, optionList, pageHeader, statusClass, today, withButtonLoading } from "./utils.js";
 
 export const renewalsModule = {
   render({ data, settings }) {
@@ -90,29 +90,31 @@ export const renewalsModule = {
 
       const baseDate = daysUntil(member.endDate) > 0 ? member.endDate : payload.renewalDate;
       const nextEndDate = addDays(baseDate, plan.durationDays);
-      await context.services.data.save(collections.members, {
-        ...member,
-        planId: plan.id,
-        startDate: payload.renewalDate,
-        endDate: nextEndDate,
-        status: "Active"
-      });
+      await withButtonLoading(form.querySelector("[type='submit']"), async () => {
+        await context.services.data.save(collections.members, {
+          ...member,
+          planId: plan.id,
+          startDate: payload.renewalDate,
+          endDate: nextEndDate,
+          status: "Active"
+        });
 
-      await context.services.data.save(collections.payments, {
-        memberId: member.id,
-        planId: plan.id,
-        amount: Number(payload.amount),
-        date: payload.renewalDate,
-        method: payload.method,
-        collectedBy: context.profile.name,
-        status: "Paid",
-        receiptNumber: `RCPT-${Date.now().toString().slice(-8)}`
-      });
+        await context.services.data.save(collections.payments, {
+          memberId: member.id,
+          planId: plan.id,
+          amount: Number(payload.amount),
+          date: payload.renewalDate,
+          method: payload.method,
+          collectedBy: context.profile.name,
+          status: "Paid",
+          receiptNumber: `RCPT-${Date.now().toString().slice(-8)}`
+        });
 
-      context.toast("Membership renewed.");
-      form.reset();
-      form.renewalDate.value = today();
-      await context.refresh();
+        context.toast("Membership renewed.");
+        form.reset();
+        form.renewalDate.value = today();
+        await context.refresh();
+      }, "Renewing...");
     });
   }
 };

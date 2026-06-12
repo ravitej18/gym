@@ -178,3 +178,103 @@ export function nameCell(name, sub = "") {
     </span>
   `;
 }
+
+/**
+ * Styled confirmation dialog. Replaces window.confirm() with markup that matches
+ * the app theme. Resolves true on confirm, false on cancel/backdrop/escape.
+ */
+export function confirmDialog({ title = "Are you sure?", body = "", confirmText = "Confirm", danger = true } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true">
+        <h2>${escapeHtml(title)}</h2>
+        ${body ? `<p>${escapeHtml(body)}</p>` : ""}
+        <div class="button-row modal-actions">
+          <button class="ghost-button" data-modal="cancel" type="button">Cancel</button>
+          <button class="${danger ? "danger-button" : "primary-button"}" data-modal="ok" type="button">${escapeHtml(confirmText)}</button>
+        </div>
+      </div>
+    `;
+
+    function close(result) {
+      document.removeEventListener("keydown", onKey);
+      overlay.remove();
+      resolve(result);
+    }
+    function onKey(event) {
+      if (event.key === "Escape") close(false);
+    }
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close(false);
+    });
+    overlay.querySelector("[data-modal='cancel']").addEventListener("click", () => close(false));
+    overlay.querySelector("[data-modal='ok']").addEventListener("click", () => close(true));
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    overlay.querySelector("[data-modal='ok']").focus();
+  });
+}
+
+/**
+ * Wrap an async form/button handler so the button shows a busy state and can't
+ * be double-submitted. `button` may be the submit button or any clickable.
+ */
+export async function withButtonLoading(button, action, busyLabel = "Saving...") {
+  if (!button) return action();
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.dataset.loading = "true";
+  button.innerHTML = `<span class="spinner"></span>${escapeHtml(busyLabel)}`;
+  try {
+    return await action();
+  } finally {
+    button.disabled = false;
+    delete button.dataset.loading;
+    button.innerHTML = original;
+  }
+}
+
+/**
+ * Lightweight sparkline/trend chart (inline SVG) for a numeric series.
+ * points: array of { label, value }. Returns an SVG string.
+ */
+export function trendChart(points, { color = "var(--teal)", height = 160 } = {}) {
+  const clean = points.filter((p) => Number.isFinite(Number(p.value)));
+  if (clean.length < 2) {
+    return `<div class="table-empty">Add at least two records to see a trend.</div>`;
+  }
+  const width = 320;
+  const pad = 8;
+  const values = clean.map((p) => Number(p.value));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const stepX = (width - pad * 2) / (clean.length - 1);
+  const coords = clean.map((p, i) => {
+    const x = pad + i * stepX;
+    const y = height - pad - ((Number(p.value) - min) / span) * (height - pad * 2);
+    return [x, y];
+  });
+  const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = `${line} L${coords[coords.length - 1][0].toFixed(1)},${height - pad} L${coords[0][0].toFixed(1)},${height - pad} Z`;
+  const dots = coords.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${color}" />`).join("");
+
+  return `
+    <div class="trend-chart">
+      <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img">
+        <path d="${area}" fill="${color}" opacity="0.12" />
+        <path d="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+        ${dots}
+      </svg>
+      <div class="trend-labels">
+        <span>${escapeHtml(clean[0].label)}</span>
+        <span>${escapeHtml(clean[clean.length - 1].label)}</span>
+      </div>
+      <div class="trend-range"><small>Low ${min}</small><small>High ${max}</small></div>
+    </div>
+  `;
+}

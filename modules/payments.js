@@ -1,4 +1,4 @@
-import { collections, dateLabel, emptyState, escapeHtml, findName, formData, money, nameCell, optionList, pageHeader, statusClass, today } from "./utils.js";
+import { collections, dateLabel, emptyState, escapeHtml, findName, formData, money, nameCell, optionList, pageHeader, statusClass, today, withButtonLoading } from "./utils.js";
 
 export const paymentsModule = {
   render({ data, settings }) {
@@ -76,12 +76,14 @@ export const paymentsModule = {
       const payload = formData(form);
       payload.amount = Number(payload.amount);
       payload.receiptNumber = payload.receiptNumber || `RCPT-${Date.now().toString().slice(-8)}`;
-      await context.services.data.save(collections.payments, payload);
-      context.toast("Payment saved.");
-      form.reset();
-      form.date.value = today();
-      form.collectedBy.value = "Owner";
-      await context.refresh();
+      await withButtonLoading(form.querySelector("[type='submit']"), async () => {
+        await context.services.data.save(collections.payments, payload);
+        context.toast("Payment saved.");
+        form.reset();
+        form.date.value = today();
+        form.collectedBy.value = "Owner";
+        await context.refresh();
+      });
     });
 
     root.querySelectorAll("[data-receipt]").forEach((button) => {
