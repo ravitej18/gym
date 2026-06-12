@@ -1,4 +1,4 @@
-import { addDays, byName, collections, dateLabel, emptyState, escapeHtml, findName, formData, memberStatus, nameCell, optionList, pageHeader, statusClass, today } from "./utils.js";
+import { addDays, byName, collections, confirmDialog, dateLabel, emptyState, escapeHtml, findName, formData, memberStatus, nameCell, optionList, pageHeader, statusClass, today, withButtonLoading } from "./utils.js";
 
 export const membersModule = {
   render({ data }) {
@@ -56,10 +56,40 @@ export const membersModule = {
         </form>
 
         <section class="panel">
-          <div class="panel-heading"><h2>Member Directory</h2><span>${members.length} total</span></div>
+          <div class="panel-heading"><h2>Member Directory</h2><span data-member-count>${members.length} total</span></div>
           ${
             members.length
-              ? `<div class="data-table members-table">
+              ? `
+                <div class="filter-bar">
+                  <label>Search
+                    <span class="search-field">
+                      <span class="material-symbols-outlined">search</span>
+                      <input type="search" data-filter="search" placeholder="Name, mobile, or email" />
+                    </span>
+                  </label>
+                  <label>Status
+                    <select data-filter="status">
+                      <option value="">All statuses</option>
+                      <option>Active</option>
+                      <option>Expiring Soon</option>
+                      <option>Expired</option>
+                      <option>Suspended</option>
+                    </select>
+                  </label>
+                  <label>Plan
+                    <select data-filter="plan">
+                      <option value="">All plans</option>
+                      ${optionList(plans, "planName")}
+                    </select>
+                  </label>
+                  <label>Trainer
+                    <select data-filter="trainer">
+                      <option value="">All trainers</option>
+                      ${optionList(trainers, "name")}
+                    </select>
+                  </label>
+                </div>
+                <div class="data-table members-table" data-member-list>
                   <div class="table-head"><span>Name</span><span>Plan</span><span>Expiry</span><span>Status</span><span></span></div>
                   ${members.map((member) => row(member, plans, trainers)).join("")}
                 </div>`
@@ -87,14 +117,22 @@ export const membersModule = {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const payload = formData(form);
+      if (payload.endDate && payload.startDate && payload.endDate < payload.startDate) {
+        context.toast("End date can't be before the start date.");
+        return;
+      }
       payload.status = payload.status === "Suspended" ? "Suspended" : memberStatus(payload);
-      await context.services.data.save(collections.members, payload);
-      context.toast(payload.id ? "Member updated." : "Member added.");
-      form.reset();
-      form.joinDate.value = today();
-      form.startDate.value = today();
-      await context.refresh();
+      await withButtonLoading(form.querySelector("[type='submit']"), async () => {
+        await context.services.data.save(collections.members, payload);
+        context.toast(payload.id ? "Member updated." : "Member added.");
+        form.reset();
+        form.joinDate.value = today();
+        form.startDate.value = today();
+        await context.refresh();
+      });
     });
+
+    bindFilters(root);
 
     root.querySelectorAll("[data-edit-member]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -110,7 +148,12 @@ export const membersModule = {
 
     root.querySelectorAll("[data-delete-member]").forEach((button) => {
       button.addEventListener("click", async () => {
-        if (!confirm("Delete this member? Related payments and attendance will remain for audit history.")) return;
+        const ok = await confirmDialog({
+          title: "Delete this member?",
+          body: "Related payments and attendance stay in your records for audit history.",
+          confirmText: "Delete member"
+        });
+        if (!ok) return;
         await context.services.data.remove(collections.members, button.dataset.deleteMember);
         context.toast("Member deleted.");
         await context.refresh();
@@ -123,10 +166,66 @@ export const membersModule = {
   }
 };
 
+function bindFilters(root) {
+  const list = root.querySelector("[data-member-list]");
+  if (!list) return;
+  const controls = {
+    search: root.querySelector("[data-filter='search']"),
+    status: root.querySelector("[data-filter='status']"),
+    plan: root.querySelector("[data-filter='plan']"),
+    trainer: root.querySelector("[data-filter='trainer']")
+  };
+  const rows = Array.from(list.querySelectorAll("[data-row]"));
+  const count = root.querySelector("[data-member-count]");
+
+  function apply() {
+    const term = (controls.search?.value || "").trim().toLowerCase();
+    const status = controls.status?.value || "";
+    const plan = controls.plan?.value || "";
+    const trainer = controls.trainer?.value || "";
+    let visible = 0;
+
+    rows.forEach((rowEl) => {
+      const match =
+        (!term || rowEl.dataset.search.includes(term)) &&
+        (!status || rowEl.dataset.status === status) &&
+        (!plan || rowEl.dataset.plan === plan) &&
+        (!trainer || rowEl.dataset.trainer === trainer);
+      rowEl.classList.toggle("hidden", !match);
+      if (match) visible += 1;
+    });
+
+    if (count) count.textContent = `${visible} of ${rows.length}`;
+    let empty = list.querySelector("[data-filter-empty]");
+    if (visible === 0) {
+      if (!empty) {
+        empty = document.createElement("div");
+        empty.className = "table-empty";
+        empty.dataset.filterEmpty = "true";
+        empty.textContent = "No members match these filters.";
+        list.appendChild(empty);
+      }
+    } else if (empty) {
+      empty.remove();
+    }
+  }
+
+  Object.values(controls).forEach((el) => {
+    el?.addEventListener("input", apply);
+    el?.addEventListener("change", apply);
+  });
+}
+
 function row(member, plans, trainers) {
   const status = memberStatus(member);
+  const haystack = [member.fullName, member.mobile, member.email].filter(Boolean).join(" ").toLowerCase();
   return `
-    <div class="table-row">
+    <div class="table-row"
+      data-row
+      data-search="${escapeHtml(haystack)}"
+      data-status="${escapeHtml(status)}"
+      data-plan="${escapeHtml(member.planId || "")}"
+      data-trainer="${escapeHtml(member.assignedTrainer || "")}">
       ${nameCell(member.fullName, member.mobile || member.email || "")}
       <span>${escapeHtml(findName(plans, member.planId))}</span>
       <span>${dateLabel(member.endDate)}</span>

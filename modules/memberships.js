@@ -1,4 +1,4 @@
-import { byName, collections, emptyState, escapeHtml, formData, money, pageHeader } from "./utils.js";
+import { byName, collections, confirmDialog, emptyState, escapeHtml, formData, money, pageHeader, withButtonLoading } from "./utils.js";
 
 export const membershipsModule = {
   render({ data, settings }) {
@@ -42,11 +42,13 @@ export const membershipsModule = {
       const payload = formData(form);
       payload.durationDays = Number(payload.durationDays);
       payload.price = Number(payload.price);
-      await context.services.data.save(collections.plans, payload);
-      context.toast(payload.id ? "Plan updated." : "Plan added.");
-      form.reset();
-      root.querySelector(".panel-heading h2").textContent = "Add Plan";
-      await context.refresh();
+      await withButtonLoading(form.querySelector("[type='submit']"), async () => {
+        await context.services.data.save(collections.plans, payload);
+        context.toast(payload.id ? "Plan updated." : "Plan added.");
+        form.reset();
+        root.querySelector(".panel-heading h2").textContent = "Add Plan";
+        await context.refresh();
+      });
     });
 
     root.querySelectorAll("[data-edit-plan]").forEach((button) => {
@@ -63,7 +65,12 @@ export const membershipsModule = {
 
     root.querySelectorAll("[data-delete-plan]").forEach((button) => {
       button.addEventListener("click", async () => {
-        if (!confirm("Delete this plan? Existing members keep their stored dates and history.")) return;
+        const ok = await confirmDialog({
+          title: "Delete this plan?",
+          body: "Existing members keep their stored dates and history.",
+          confirmText: "Delete plan"
+        });
+        if (!ok) return;
         await context.services.data.remove(collections.plans, button.dataset.deletePlan);
         context.toast("Plan deleted.");
         await context.refresh();
@@ -88,8 +95,8 @@ function planCard(plan, currency) {
       <div class="card-footer">
         <b>${money(plan.price, currency)}</b>
         <span class="row-actions">
-          <button class="icon-button" data-edit-plan="${escapeHtml(plan.id)}">Edit</button>
-          <button class="icon-button danger" data-delete-plan="${escapeHtml(plan.id)}">Del</button>
+          <button class="icon-button" data-edit-plan="${escapeHtml(plan.id)}" title="Edit"><span class="material-symbols-outlined">edit</span></button>
+          <button class="icon-button danger" data-delete-plan="${escapeHtml(plan.id)}" title="Delete"><span class="material-symbols-outlined">delete</span></button>
         </span>
       </div>
     </article>

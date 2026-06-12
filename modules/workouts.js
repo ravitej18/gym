@@ -1,4 +1,4 @@
-import { collections, emptyState, escapeHtml, formData, pageHeader } from "./utils.js";
+import { collections, emptyState, escapeHtml, formData, pageHeader, withButtonLoading } from "./utils.js";
 
 export const workoutsModule = {
   render({ data }) {
@@ -31,10 +31,12 @@ export const workoutsModule = {
     const form = root.querySelector("#workout-form");
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      await context.services.data.save(collections.workouts, formData(form));
-      context.toast("Workout template saved.");
-      form.reset();
-      await context.refresh();
+      await withButtonLoading(form.querySelector("[type='submit']"), async () => {
+        await context.services.data.save(collections.workouts, formData(form));
+        context.toast("Workout template saved.");
+        form.reset();
+        await context.refresh();
+      });
     });
   }
 };

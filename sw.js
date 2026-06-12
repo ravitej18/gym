@@ -1,4 +1,4 @@
-const CACHE_NAME = "gymflow-v6";
+const CACHE_NAME = "gymflow-v7";
 const ASSETS = [
   "./",
   "./index.html",

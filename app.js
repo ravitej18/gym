@@ -239,6 +239,21 @@ function bindAppEvents() {
   document.querySelector("[data-action='toggle-nav']")?.addEventListener("click", () => {
     document.body.classList.toggle("nav-open");
   });
+
+  const topSearch = document.querySelector(".topbar-search input");
+  topSearch?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    const term = topSearch.value.trim();
+    if (state.route !== "members") location.hash = "#/members";
+    requestAnimationFrame(() => {
+      const field = document.querySelector("[data-filter='search']");
+      if (field) {
+        field.value = term;
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.focus();
+      }
+    });
+  });
 }
 
 function showToast(message) {

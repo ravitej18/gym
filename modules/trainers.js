@@ -1,4 +1,4 @@
-import { byName, collections, emptyState, escapeHtml, formData, pageHeader } from "./utils.js";
+import { byName, collections, emptyState, escapeHtml, formData, pageHeader, withButtonLoading } from "./utils.js";
 
 export const trainersModule = {
   render({ data }) {
@@ -34,10 +34,12 @@ export const trainersModule = {
     const form = root.querySelector("#trainer-form");
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      await context.services.data.save(collections.trainers, formData(form));
-      context.toast("Trainer saved.");
-      form.reset();
-      await context.refresh();
+      await withButtonLoading(form.querySelector("[type='submit']"), async () => {
+        await context.services.data.save(collections.trainers, formData(form));
+        context.toast("Trainer saved.");
+        form.reset();
+        await context.refresh();
+      });
     });
     root.querySelectorAll("[data-edit-trainer]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -57,7 +59,7 @@ function card(trainer) {
       <div><strong>${escapeHtml(trainer.name)}</strong><span>${escapeHtml(trainer.specialization || "General")}</span></div>
       <p>${escapeHtml(trainer.mobile || "")}</p>
       <small>${escapeHtml(trainer.experience || "")}</small>
-      <div class="card-footer"><span>${escapeHtml(trainer.email || "")}</span><button class="icon-button" data-edit-trainer="${escapeHtml(trainer.id)}">Edit</button></div>
+      <div class="card-footer"><span>${escapeHtml(trainer.email || "")}</span><button class="icon-button" data-edit-trainer="${escapeHtml(trainer.id)}" title="Edit"><span class="material-symbols-outlined">edit</span></button></div>
     </article>
   `;
 }
