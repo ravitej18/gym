@@ -9,11 +9,6 @@ export function renderAuth(root, context) {
           <h1>GymFlow</h1>
           <p>Manage members, payments, renewals, trainers, and daily operations from a static web app.</p>
         </div>
-        <div class="auth-stats">
-          <div><strong>0</strong><span>server bills</span></div>
-          <div><strong>PWA</strong><span>installable app</span></div>
-          <div><strong>Sync</strong><span>Firebase ready</span></div>
-        </div>
       </section>
       <section class="auth-panel">
         <div class="auth-tabs">

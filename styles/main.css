@@ -575,7 +575,7 @@ textarea:focus {
   padding: 48px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   background:
     linear-gradient(rgba(12, 45, 40, 0.72), rgba(12, 45, 40, 0.72)),
     url("https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1400&q=80") center / cover;
@@ -596,29 +596,6 @@ textarea:focus {
   max-width: 560px;
   font-size: 1.1rem;
   line-height: 1.6;
-}
-
-.auth-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  max-width: 720px;
-}
-
-.auth-stats div {
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.auth-stats strong,
-.auth-stats span {
-  display: block;
-}
-
-.auth-stats span {
-  color: rgba(255, 255, 255, 0.78);
 }
 
 .auth-panel {
@@ -722,8 +699,7 @@ code {
 
   .form-grid,
   .metric-grid,
-  .card-grid,
-  .auth-stats {
+  .card-grid {
     grid-template-columns: 1fr;
   }
 
