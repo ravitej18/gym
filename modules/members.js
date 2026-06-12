@@ -1,4 +1,4 @@
-import { addDays, byName, collections, dateLabel, emptyState, escapeHtml, findName, formData, memberStatus, optionList, pageHeader, statusClass, today } from "./utils.js";
+import { addDays, byName, collections, dateLabel, emptyState, escapeHtml, findName, formData, memberStatus, nameCell, optionList, pageHeader, statusClass, today } from "./utils.js";
 
 export const membersModule = {
   render({ data }) {
@@ -127,16 +127,13 @@ function row(member, plans, trainers) {
   const status = memberStatus(member);
   return `
     <div class="table-row">
-      <span>
-        <strong>${escapeHtml(member.fullName)}</strong>
-        <small>${escapeHtml(member.mobile || member.email || "")}</small>
-      </span>
+      ${nameCell(member.fullName, member.mobile || member.email || "")}
       <span>${escapeHtml(findName(plans, member.planId))}</span>
       <span>${dateLabel(member.endDate)}</span>
       <span><mark class="status ${statusClass(status)}">${escapeHtml(status)}</mark></span>
       <span class="row-actions">
-        <button class="icon-button" data-edit-member="${escapeHtml(member.id)}" title="Edit">Edit</button>
-        <button class="icon-button danger" data-delete-member="${escapeHtml(member.id)}" title="Delete">Del</button>
+        <button class="icon-button" data-edit-member="${escapeHtml(member.id)}" title="Edit"><span class="material-symbols-outlined">edit</span></button>
+        <button class="icon-button danger" data-delete-member="${escapeHtml(member.id)}" title="Delete"><span class="material-symbols-outlined">delete</span></button>
       </span>
       <small class="table-note">Trainer: ${escapeHtml(findName(trainers, member.assignedTrainer, "Unassigned"))}</small>
     </div>

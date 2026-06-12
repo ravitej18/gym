@@ -1,4 +1,4 @@
-import { collections, dateLabel, emptyState, escapeHtml, findName, formData, money, optionList, pageHeader, statusClass, today } from "./utils.js";
+import { collections, dateLabel, emptyState, escapeHtml, findName, formData, money, nameCell, optionList, pageHeader, statusClass, today } from "./utils.js";
 
 export const paymentsModule = {
   render({ data, settings }) {
@@ -102,10 +102,10 @@ function row(payment, members, plans, currency) {
         <strong>${escapeHtml(payment.receiptNumber || payment.id)}</strong>
         <small>${dateLabel(payment.date)} via ${escapeHtml(payment.method)}</small>
       </span>
-      <span>${escapeHtml(findName(members, payment.memberId))}</span>
+      <span>${nameCell(findName(members, payment.memberId))}</span>
       <span>${money(payment.amount, currency)}</span>
       <span><mark class="status ${statusClass(payment.status)}">${escapeHtml(payment.status)}</mark></span>
-      <span class="row-actions"><button class="icon-button" data-receipt="${escapeHtml(payment.id)}">Print</button></span>
+      <span class="row-actions"><button class="icon-button" data-receipt="${escapeHtml(payment.id)}" title="Print receipt"><span class="material-symbols-outlined">receipt_long</span>Receipt</button></span>
       <small class="table-note">Plan: ${escapeHtml(findName(plans, payment.planId))}</small>
     </div>
   `;

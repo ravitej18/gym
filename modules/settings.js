@@ -6,7 +6,7 @@ export const settingsModule = {
       ${pageHeader("Settings")}
       <div class="work-grid">
         <form class="panel stack" id="settings-form">
-          <div class="panel-heading"><h2>Gym Profile</h2><span>${escapeHtml(services.mode)}</span></div>
+          <div class="panel-heading"><h2>Gym Profile</h2><span>${services.mode === "firebase" ? "Live" : "Demo"}</span></div>
           <div class="form-grid">
             <label>Gym name<input name="gymName" value="${escapeHtml(settings?.gymName || "")}" required /></label>
             <label>Owner name<input name="ownerName" value="${escapeHtml(settings?.ownerName || "")}" /></label>
@@ -22,13 +22,8 @@ export const settingsModule = {
           <button class="primary-button" type="submit">Save settings</button>
         </form>
         <section class="panel stack">
-          <div class="panel-heading"><h2>Deployment</h2></div>
-          <div class="check-list">
-            <span>Fork or copy this repository.</span>
-            <span>Create a Firebase project and enable Auth plus Firestore.</span>
-            <span>Copy <code>gym.config.js.template</code> into <code>gym.config.js</code> with real keys.</span>
-            <span>Publish the repository with GitHub Pages.</span>
-          </div>
+          <div class="panel-heading"><h2>Backup &amp; Restore</h2></div>
+          <p class="panel-hint">Download a full copy of your gym data, or restore from a previous export.</p>
           <div class="button-row">
             <button class="ghost-button" data-action="export" type="button">Export data</button>
             <label class="file-button">Import JSON<input type="file" accept="application/json" data-action="import" /></label>

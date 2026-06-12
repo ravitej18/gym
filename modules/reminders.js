@@ -1,4 +1,4 @@
-import { collections, dateLabel, daysUntil, emptyState, escapeHtml, memberStatus, pageHeader, statusClass, whatsappUrl } from "./utils.js";
+import { collections, dateLabel, daysUntil, emptyState, escapeHtml, memberStatus, nameCell, pageHeader, statusClass, whatsappUrl } from "./utils.js";
 
 export const remindersModule = {
   render({ data, settings }) {
@@ -45,16 +45,13 @@ function row(member, settings) {
   const message = buildMessage(member, settings);
   return `
     <div class="table-row">
-      <span>
-        <strong>${escapeHtml(member.fullName)}</strong>
-        <small>${escapeHtml(member.mobile || "")}</small>
-      </span>
+      ${nameCell(member.fullName, member.mobile || "")}
       <span>${dateLabel(member.endDate)}</span>
       <span><mark class="status ${statusClass(member.computedStatus)}">${escapeHtml(member.computedStatus)}</mark></span>
       <span><small>${escapeHtml(message)}</small></span>
       <span class="row-actions">
-        <a class="icon-button" href="${whatsappUrl(member, message)}" target="_blank" rel="noreferrer">WhatsApp</a>
-        <button class="icon-button" data-reminder-sent="${escapeHtml(member.id)}">Sent</button>
+        <a class="primary-button" href="${whatsappUrl(member, message)}" target="_blank" rel="noreferrer"><span class="material-symbols-outlined">send</span>Send</a>
+        <button class="icon-button" data-reminder-sent="${escapeHtml(member.id)}"><span class="material-symbols-outlined">done</span></button>
       </span>
     </div>
   `;

@@ -32,7 +32,7 @@ export function renderAuth(root, context) {
           <button class="primary-button" type="submit">Create owner account</button>
         </form>
 
-        <p class="auth-note">${escapeHtml(context.mode === "firebase" ? "Connected to Firebase." : "Using local browser storage until Firebase keys are configured.")}</p>
+        <p class="auth-note">${escapeHtml(context.mode === "firebase" ? "Your gym data is saved and synced automatically." : "Running in demo mode on this device.")}</p>
       </section>
     </main>
   `;

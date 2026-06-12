@@ -115,6 +115,38 @@ export function downloadJson(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+const SHEETJS_URL = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+let sheetJsPromise = null;
+
+export function loadSheetJs() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (sheetJsPromise) return sheetJsPromise;
+
+  sheetJsPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = SHEETJS_URL;
+    script.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error("SheetJS failed to initialise.")));
+    script.onerror = () => {
+      sheetJsPromise = null;
+      reject(new Error("Could not load the Excel export library. Check your connection and try again."));
+    };
+    document.head.appendChild(script);
+  });
+  return sheetJsPromise;
+}
+
+export async function exportToExcel(filename, sheets) {
+  const XLSX = await loadSheetJs();
+  const workbook = XLSX.utils.book_new();
+  sheets
+    .filter((sheet) => sheet && sheet.rows)
+    .forEach((sheet) => {
+      const worksheet = XLSX.utils.json_to_sheet(sheet.rows.length ? sheet.rows : [{}]);
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name.slice(0, 31));
+    });
+  XLSX.writeFile(workbook, filename);
+}
+
 export function normalizePhone(value = "") {
   return String(value).replace(/[^\d+]/g, "");
 }
@@ -122,4 +154,27 @@ export function normalizePhone(value = "") {
 export function whatsappUrl(member, message) {
   const phone = normalizePhone(member.mobile);
   return `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(message)}`;
+}
+
+export function initials(name = "") {
+  const parsed = String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] || "")
+    .join("")
+    .toUpperCase();
+  return parsed || "--";
+}
+
+export function nameCell(name, sub = "") {
+  return `
+    <span class="name-cell">
+      <span class="avatar small">${escapeHtml(initials(name))}</span>
+      <span class="name-cell-text">
+        <strong>${escapeHtml(name || "-")}</strong>
+        ${sub ? `<small>${escapeHtml(sub)}</small>` : ""}
+      </span>
+    </span>
+  `;
 }
