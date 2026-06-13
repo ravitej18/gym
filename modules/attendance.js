@@ -1,7 +1,11 @@
 import { collections, dateLabel, daysUntil, emptyState, escapeHtml, findName, formData, nameCell, optionList, pageHeader, today, withButtonLoading } from "./utils.js";
 
 export const attendanceModule = {
-  render({ data }) {
+  render(context) {
+    if (context.profile?.role === "member") {
+      return renderMemberAttendance(context);
+    }
+    const { data } = context;
     const records = data.attendance || [];
     const members = data.members || [];
     const trainers = data.trainers || [];
@@ -26,7 +30,20 @@ export const attendanceModule = {
         <form class="panel stack" id="attendance-form">
           <div class="panel-heading"><h2>Check In</h2></div>
           <div class="form-grid">
-            <label>Member<select name="memberId" required><option value="">Select member</option>${optionList(members, "fullName")}</select></label>
+            <label>Member
+              <input
+                type="text"
+                data-member-search
+                list="checkin-member-options"
+                placeholder="Type to search members"
+                autocomplete="off"
+                required
+              />
+              <input type="hidden" name="memberId" />
+              <datalist id="checkin-member-options">
+                ${members.map((member) => `<option data-id="${escapeHtml(member.id)}" value="${escapeHtml(member.fullName || member.id)}"></option>`).join("")}
+              </datalist>
+            </label>
             <label>Date<input name="date" type="date" value="${todayStr}" required /></label>
             <label>Time<input name="time" type="time" value="${now.toTimeString().slice(0, 5)}" required /></label>
             <label>Trainer<select name="trainerId"><option value="">Unassigned</option>${optionList(trainers, "name")}</select></label>
@@ -60,16 +77,45 @@ export const attendanceModule = {
     `;
   },
   bind(root, context) {
+    if (context.profile?.role === "member") {
+      bindMemberAttendance(root, context);
+      return;
+    }
     const form = root.querySelector("#attendance-form");
+    const memberSearch = form.querySelector("[data-member-search]");
+    const memberIdField = form.querySelector("[name='memberId']");
+
+    // Resolve the typed member name -> member id; auto-fill the assigned trainer.
+    function resolveMember() {
+      const typed = memberSearch.value.trim().toLowerCase();
+      const member = (context.data.members || []).find(
+        (item) => (item.fullName || item.id || "").toLowerCase() === typed
+      );
+      memberIdField.value = member?.id || "";
+      // Pre-fill the trainer the member was assigned during onboarding (overridable).
+      if (member?.assignedTrainer) form.trainerId.value = member.assignedTrainer;
+      // Surface invalid typed text to native form validation.
+      memberSearch.setCustomValidity(memberIdField.value ? "" : "Pick a member from the list.");
+    }
+
+    memberSearch.addEventListener("input", resolveMember);
+    memberSearch.addEventListener("change", resolveMember);
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      resolveMember();
+      if (!memberIdField.value) {
+        memberSearch.reportValidity();
+        return;
+      }
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.attendance, formData(form));
+        const saved = await context.services.data.save(collections.attendance, formData(form));
         context.toast("Attendance recorded.");
         form.reset();
         form.date.value = today();
         form.time.value = new Date().toTimeString().slice(0, 5);
-        await context.refresh();
+        memberSearch.setCustomValidity("");
+        context.applyChange(collections.attendance, saved);
       });
     });
 
@@ -83,6 +129,71 @@ export const attendanceModule = {
     });
   }
 };
+
+// ===== Member self check-in view =====
+function renderMemberAttendance(context) {
+  const me = context.myMember;
+  if (!me) {
+    return `
+      ${pageHeader("Attendance")}
+      ${emptyState("Membership being set up", "Once your gym finalises your membership you can check in here.")}
+    `;
+  }
+  const todayStr = today();
+  const mine = (context.data.attendance || [])
+    .filter((record) => record.memberId === me.id)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const checkedInToday = mine.some((record) => record.date === todayStr);
+
+  return `
+    ${pageHeader("Attendance")}
+    <div class="work-grid">
+      <section class="panel stack">
+        <div class="panel-heading"><h2>Check In</h2></div>
+        <p class="panel-hint">${checkedInToday ? "You've already checked in today — feel free to check in again for another session." : "Tap below to record your visit."}</p>
+        <button class="primary-button" data-self-checkin type="button"><span class="material-symbols-outlined">how_to_reg</span>Check in now</button>
+      </section>
+      <section class="panel">
+        <div class="panel-heading"><h2>My Recent Check-ins</h2><span>${mine.length} total</span></div>
+        ${
+          mine.length
+            ? `<div class="data-table">
+                <div class="table-head"><span>Date</span><span>Time</span></div>
+                ${mine
+                  .slice(0, 15)
+                  .map(
+                    (record) => `
+                      <div class="table-row" style="grid-template-columns:1fr 1fr">
+                        <span>${dateLabel(record.date)}</span>
+                        <span>${escapeHtml(record.time || "-")}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>`
+            : emptyState("No check-ins yet", "Your visits will appear here once you check in.")
+        }
+      </section>
+    </div>
+  `;
+}
+
+function bindMemberAttendance(root, context) {
+  const button = root.querySelector("[data-self-checkin]");
+  const me = context.myMember;
+  if (!button || !me) return;
+  button.addEventListener("click", async () => {
+    await withButtonLoading(button, async () => {
+      const saved = await context.services.data.save(collections.attendance, {
+        memberId: me.id,
+        date: today(),
+        time: new Date().toTimeString().slice(0, 5)
+      });
+      context.toast("Checked in. Have a great session!");
+      context.applyChange(collections.attendance, saved);
+    }, "Checking in...");
+  });
+}
 
 function row(record, members, trainers) {
   return `

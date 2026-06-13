@@ -12,22 +12,31 @@ import { workoutsModule } from "./modules/workouts.js";
 import { progressModule } from "./modules/progress.js";
 import { reportsModule } from "./modules/reports.js";
 import { settingsModule } from "./modules/settings.js";
+import { myMembershipModule } from "./modules/my-membership.js";
+import { myPaymentsModule } from "./modules/my-payments.js";
+import { trainerCheckinModule } from "./modules/trainer-checkin.js";
 
 const appRoot = document.querySelector("#app");
 
+// 4th element = roles allowed to see this nav item / route. Defaults to owner+member.
+const ALL_ROLES = ["owner", "member"];
 const nav = [
-  ["dashboard", "Dashboard", "grid_view"],
-  ["members", "Members", "group"],
-  ["plans", "Plans", "layers"],
-  ["payments", "Payments", "payments"],
-  ["renewals", "Renewals", "autorenew"],
-  ["reminders", "Reminders", "chat"],
-  ["trainers", "Trainers", "badge"],
-  ["attendance", "Attendance", "how_to_reg"],
-  ["workouts", "Workouts", "fitness_center"],
-  ["progress", "Progress", "trending_up"],
-  ["reports", "Reports", "bar_chart"],
-  ["settings", "Settings", "settings"]
+  ["dashboard", "Dashboard", "grid_view", ["owner", "member", "trainer"]],
+  ["members", "Members", "group", ["owner"]],
+  ["plans", "Plans", "layers", ["owner"]],
+  ["payments", "Payments", "payments", ["owner"]],
+  ["renewals", "Renewals", "autorenew", ["owner"]],
+  ["reminders", "Reminders", "chat", ["owner"]],
+  ["trainers", "Trainers", "badge", ["owner"]],
+  ["attendance", "Attendance", "how_to_reg", ALL_ROLES],
+  ["workouts", "Workouts", "fitness_center", ["owner"]],
+  ["progress", "Progress", "trending_up", ALL_ROLES],
+  ["reports", "Reports", "bar_chart", ["owner"]],
+  ["my-membership", "My Membership", "card_membership", ["member"]],
+  ["my-payments", "My Payments", "receipt_long", ["member"]],
+  ["trainer-checkin", "Check In", "how_to_reg", ["trainer"]],
+  ["my-checkins", "My Check-ins", "history", ["trainer"]],
+  ["settings", "Settings", "settings", ["owner"]]
 ];
 
 const modules = {
@@ -42,8 +51,18 @@ const modules = {
   workouts: workoutsModule,
   progress: progressModule,
   reports: reportsModule,
+  "my-membership": myMembershipModule,
+  "my-payments": myPaymentsModule,
+  "trainer-checkin": trainerCheckinModule,
+  "my-checkins": trainerCheckinModule,
   settings: settingsModule
 };
+
+function roleAllows(route, role) {
+  const entry = nav.find(([key]) => key === route);
+  const roles = entry?.[3] || ALL_ROLES;
+  return roles.includes(role);
+}
 
 const collectionNames = [
   "members",
@@ -54,7 +73,8 @@ const collectionNames = [
   "workout_templates",
   "workout_assignments",
   "progress_records",
-  "reminders"
+  "reminders",
+  "trainer_attendance"
 ];
 
 const state = {
@@ -96,11 +116,9 @@ async function boot() {
   render();
 }
 
-async function refreshData() {
-  state.loading = true;
-  state.error = "";
-  render();
-
+// Fetch settings + all collections into state. Sets state.error on failure.
+// Does NOT render — callers decide whether to do a full render() or renderView().
+async function reloadData() {
   try {
     const [settings, ...collections] = await Promise.all([
       state.services.data.getSettings(),
@@ -115,10 +133,51 @@ async function refreshData() {
     state.error = /offline|unavailable|network/i.test(error?.message || "")
       ? "Can't reach the database. Check your connection (an ad-blocker, VPN, or proxy can block Firestore), then retry."
       : error?.message || "Could not load your workspace.";
-  } finally {
-    state.loading = false;
-    render();
   }
+}
+
+// Full refresh: reload data and rebuild the whole shell. Used on initial load
+// and when shell-level data changes (e.g. gym name in the sidebar).
+async function refreshData() {
+  state.loading = true;
+  state.error = "";
+  render();
+  await reloadData();
+  state.loading = false;
+  render();
+}
+
+// Scoped refresh: reload data but re-render only the current module's #view,
+// avoiding a full shell rebuild (no flicker / scroll jump). Used after form saves.
+async function refreshView() {
+  await reloadData();
+  if (state.error) {
+    render(); // surface the error screen via the full renderer
+    return;
+  }
+  renderView();
+}
+
+// Apply a just-saved doc to local state WITHOUT re-reading from the backend.
+// save() returns the complete persisted doc, so we upsert it in place and
+// re-render only the current view — 0 extra reads per save.
+function applyChange(collectionName, savedDoc) {
+  if (!savedDoc) return;
+  const list = state.data[collectionName] || [];
+  const index = list.findIndex((item) => item.id === savedDoc.id);
+  if (index >= 0) {
+    list[index] = { ...list[index], ...savedDoc };
+  } else {
+    list.unshift(savedDoc); // newest first, matches list() sort by updatedAt desc
+  }
+  state.data[collectionName] = list;
+  renderView();
+}
+
+// Remove a doc from local state (after a successful delete) and re-render.
+function applyRemoval(collectionName, id) {
+  state.data[collectionName] = (state.data[collectionName] || []).filter((item) => item.id !== id);
+  renderView();
 }
 
 function render() {
@@ -172,8 +231,16 @@ function render() {
     return;
   }
 
+  // Route guard: bounce a role off a route it isn't allowed to see.
+  const role = state.profile.role || "owner";
+  if (!roleAllows(state.route, role)) {
+    state.route = "dashboard";
+    if (location.hash !== "#/dashboard") location.hash = "#/dashboard";
+  }
+
   const currentModule = modules[state.route] || dashboardModule;
   const currentNav = nav.find(([key]) => key === state.route) || nav[0];
+  const visibleNav = nav.filter(([, , , roles]) => (roles || ALL_ROLES).includes(role));
 
   appRoot.innerHTML = `
     <aside class="sidebar">
@@ -185,7 +252,7 @@ function render() {
         </div>
       </div>
       <nav class="nav-list">
-        ${nav
+        ${visibleNav
           .map(
             ([key, label, icon]) => `
               <a href="#/${key}" class="${key === currentNav[0] ? "active" : ""}">
@@ -216,7 +283,7 @@ function render() {
           <input type="search" placeholder="Search members, payments..." aria-label="Search" />
         </div>
         <div class="topbar-actions">
-          <a class="pill-button" href="#/attendance">
+          <a class="pill-button" href="#/${state.profile.role === "trainer" ? "trainer-checkin" : "attendance"}">
             <span class="material-symbols-outlined">login</span>Check-in
           </a>
           <div class="topbar-user">
@@ -235,13 +302,36 @@ function render() {
   currentModule.bind?.(document.querySelector("#view"), makeContext());
 }
 
+// Re-render only the current module's #view (and re-bind it), leaving the
+// sidebar/topbar untouched. No-op if the shell isn't mounted yet.
+function renderView() {
+  const view = document.querySelector("#view");
+  if (!view) {
+    render();
+    return;
+  }
+  const currentModule = modules[state.route] || dashboardModule;
+  view.innerHTML = currentModule.render(makeContext());
+  currentModule.bind?.(view, makeContext());
+}
+
 function makeContext() {
+  // The signed-in member's / trainer's own roster id (doc linked by uid), if any.
+  const myMember = (state.data.members || []).find((m) => m.uid === state.profile?.uid) || null;
+  const myTrainer = (state.data.trainers || []).find((t) => t.uid === state.profile?.uid) || null;
   return {
     profile: state.profile,
     settings: state.settings,
     data: state.data,
     services: state.services,
     refresh: refreshData,
+    refreshView,
+    applyChange,
+    applyRemoval,
+    myMember,
+    myMemberId: myMember?.id || null,
+    myTrainer,
+    myTrainerId: myTrainer?.id || null,
     navigate(route) {
       location.hash = `#/${route}`;
     },

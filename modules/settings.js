@@ -22,6 +22,18 @@ export const settingsModule = {
           <button class="primary-button" type="submit">Save settings</button>
         </form>
         <section class="panel stack">
+          <div class="panel-heading"><h2>Gym Code</h2></div>
+          <p class="panel-hint">Share this code so members can register and join your gym.</p>
+          ${
+            settings?.gymCode
+              ? `<div class="code-row">
+                  <code class="gym-code">${escapeHtml(settings.gymCode)}</code>
+                  <button class="ghost-button" data-action="copy-code" type="button"><span class="material-symbols-outlined">content_copy</span>Copy</button>
+                </div>`
+              : `<p class="panel-hint">Your gym code will appear here after your next save.</p>`
+          }
+        </section>
+        <section class="panel stack">
           <div class="panel-heading"><h2>Backup &amp; Restore</h2></div>
           <p class="panel-hint">Download a full copy of your gym data, or restore from a previous export.</p>
           <div class="button-row">
@@ -39,6 +51,15 @@ export const settingsModule = {
       await context.services.data.saveSettings(formData(form));
       context.toast("Settings saved.");
       await context.refresh();
+    });
+
+    root.querySelector("[data-action='copy-code']")?.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(context.settings?.gymCode || "");
+        context.toast("Gym code copied.");
+      } catch (error) {
+        context.toast("Couldn't copy — select the code manually.");
+      }
     });
 
     root.querySelector("[data-action='export']")?.addEventListener("click", async () => {

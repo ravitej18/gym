@@ -91,7 +91,7 @@ export const renewalsModule = {
       const baseDate = daysUntil(member.endDate) > 0 ? member.endDate : payload.renewalDate;
       const nextEndDate = addDays(baseDate, plan.durationDays);
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.members, {
+        const savedMember = await context.services.data.save(collections.members, {
           ...member,
           planId: plan.id,
           startDate: payload.renewalDate,
@@ -99,7 +99,7 @@ export const renewalsModule = {
           status: "Active"
         });
 
-        await context.services.data.save(collections.payments, {
+        const savedPayment = await context.services.data.save(collections.payments, {
           memberId: member.id,
           planId: plan.id,
           amount: Number(payload.amount),
@@ -113,7 +113,10 @@ export const renewalsModule = {
         context.toast("Membership renewed.");
         form.reset();
         form.renewalDate.value = today();
-        await context.refresh();
+        // Update both collections in place; applyChange re-renders the view (calling
+        // it twice just re-renders twice — harmless and keeps both lists current).
+        context.applyChange(collections.members, savedMember);
+        context.applyChange(collections.payments, savedPayment);
       }, "Renewing...");
     });
   }

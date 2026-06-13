@@ -1,4 +1,4 @@
-import { byName, collections, emptyState, escapeHtml, formData, pageHeader, withButtonLoading } from "./utils.js";
+import { byName, collections, emptyState, escapeHtml, formData, pageHeader, statusClass, withButtonLoading } from "./utils.js";
 
 export const trainersModule = {
   render({ data }) {
@@ -35,12 +35,24 @@ export const trainersModule = {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.trainers, formData(form));
+        const saved = await context.services.data.save(collections.trainers, formData(form));
         context.toast("Trainer saved.");
         form.reset();
-        await context.refresh();
+        context.applyChange(collections.trainers, saved);
       });
     });
+    root.querySelectorAll("[data-approve-trainer]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const trainer = context.data.trainers.find((item) => item.id === button.dataset.approveTrainer);
+        if (!trainer) return;
+        await withButtonLoading(button, async () => {
+          const saved = await context.services.data.save(collections.trainers, { ...trainer, status: "Active" });
+          context.toast("Trainer approved.");
+          context.applyChange(collections.trainers, saved);
+        }, "Approving...");
+      });
+    });
+
     root.querySelectorAll("[data-edit-trainer]").forEach((button) => {
       button.addEventListener("click", () => {
         const trainer = context.data.trainers.find((item) => item.id === button.dataset.editTrainer);
@@ -54,12 +66,22 @@ export const trainersModule = {
 };
 
 function card(trainer) {
+  const pending = trainer.status === "Pending";
   return `
     <article class="item-card">
-      <div><strong>${escapeHtml(trainer.name)}</strong><span>${escapeHtml(trainer.specialization || "General")}</span></div>
+      <div>
+        <strong>${escapeHtml(trainer.name)}</strong>
+        ${pending ? `<mark class="status ${statusClass("Pending")}">Pending</mark>` : `<span>${escapeHtml(trainer.specialization || "General")}</span>`}
+      </div>
       <p>${escapeHtml(trainer.mobile || "")}</p>
       <small>${escapeHtml(trainer.experience || "")}</small>
-      <div class="card-footer"><span>${escapeHtml(trainer.email || "")}</span><button class="icon-button" data-edit-trainer="${escapeHtml(trainer.id)}" title="Edit"><span class="material-symbols-outlined">edit</span></button></div>
+      <div class="card-footer">
+        <span>${escapeHtml(trainer.email || "")}</span>
+        <span class="row-actions">
+          ${pending ? `<button class="icon-button" data-approve-trainer="${escapeHtml(trainer.id)}" title="Approve"><span class="material-symbols-outlined">check_circle</span></button>` : ""}
+          <button class="icon-button" data-edit-trainer="${escapeHtml(trainer.id)}" title="Edit"><span class="material-symbols-outlined">edit</span></button>
+        </span>
+      </div>
     </article>
   `;
 }

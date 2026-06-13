@@ -70,6 +70,7 @@ export const membersModule = {
                   <label>Status
                     <select data-filter="status">
                       <option value="">All statuses</option>
+                      <option>Pending</option>
                       <option>Active</option>
                       <option>Expiring Soon</option>
                       <option>Expired</option>
@@ -123,12 +124,12 @@ export const membersModule = {
       }
       payload.status = payload.status === "Suspended" ? "Suspended" : memberStatus(payload);
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.members, payload);
+        const saved = await context.services.data.save(collections.members, payload);
         context.toast(payload.id ? "Member updated." : "Member added.");
         form.reset();
         form.joinDate.value = today();
         form.startDate.value = today();
-        await context.refresh();
+        context.applyChange(collections.members, saved);
       });
     });
 
@@ -146,6 +147,20 @@ export const membersModule = {
       });
     });
 
+    root.querySelectorAll("[data-approve-member]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const member = context.data.members.find((item) => item.id === button.dataset.approveMember);
+        if (!member) return;
+        await withButtonLoading(button, async () => {
+          // Approve: clear Pending; recompute a date-based status (Active/Expiring/Expired).
+          const next = { ...member, status: memberStatus({ ...member, status: "" }) };
+          const saved = await context.services.data.save(collections.members, next);
+          context.toast("Member approved.");
+          context.applyChange(collections.members, saved);
+        }, "Approving...");
+      });
+    });
+
     root.querySelectorAll("[data-delete-member]").forEach((button) => {
       button.addEventListener("click", async () => {
         const ok = await confirmDialog({
@@ -156,7 +171,7 @@ export const membersModule = {
         if (!ok) return;
         await context.services.data.remove(collections.members, button.dataset.deleteMember);
         context.toast("Member deleted.");
-        await context.refresh();
+        context.applyRemoval(collections.members, button.dataset.deleteMember);
       });
     });
 
@@ -231,6 +246,11 @@ function row(member, plans, trainers) {
       <span>${dateLabel(member.endDate)}</span>
       <span><mark class="status ${statusClass(status)}">${escapeHtml(status)}</mark></span>
       <span class="row-actions">
+        ${
+          member.status === "Pending"
+            ? `<button class="icon-button" data-approve-member="${escapeHtml(member.id)}" title="Approve"><span class="material-symbols-outlined">check_circle</span></button>`
+            : ""
+        }
         <button class="icon-button" data-edit-member="${escapeHtml(member.id)}" title="Edit"><span class="material-symbols-outlined">edit</span></button>
         <button class="icon-button danger" data-delete-member="${escapeHtml(member.id)}" title="Delete"><span class="material-symbols-outlined">delete</span></button>
       </span>

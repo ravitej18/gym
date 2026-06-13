@@ -32,10 +32,10 @@ export const workoutsModule = {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.workouts, formData(form));
+        const saved = await context.services.data.save(collections.workouts, formData(form));
         context.toast("Workout template saved.");
         form.reset();
-        await context.refresh();
+        context.applyChange(collections.workouts, saved);
       });
     });
   }

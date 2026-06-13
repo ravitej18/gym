@@ -8,7 +8,11 @@ const METRICS = [
 ];
 
 export const progressModule = {
-  render({ data }) {
+  render(context) {
+    if (context.profile?.role === "member") {
+      return renderMemberProgress(context);
+    }
+    const { data } = context;
     const records = data.progress_records || [];
     const members = data.members || [];
     const firstMember = members[0]?.id || "";
@@ -62,15 +66,19 @@ export const progressModule = {
     `;
   },
   bind(root, context) {
+    if (context.profile?.role === "member") {
+      bindMemberProgress(root, context);
+      return;
+    }
     const form = root.querySelector("#progress-form");
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.progress, formData(form));
+        const saved = await context.services.data.save(collections.progress, formData(form));
         context.toast("Progress saved.");
         form.reset();
         form.date.value = today();
-        await context.refresh();
+        context.applyChange(collections.progress, saved);
       });
     });
 
@@ -84,6 +92,66 @@ export const progressModule = {
     metricSel?.addEventListener("change", redraw);
   }
 };
+
+// ===== Member read-only progress view =====
+function renderMemberProgress(context) {
+  const me = context.myMember;
+  if (!me) {
+    return `
+      ${pageHeader("Progress")}
+      ${emptyState("Membership being set up", "Your progress records will appear here once your gym adds them.")}
+    `;
+  }
+  const records = (context.data.progress_records || [])
+    .filter((r) => r.memberId === me.id)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  return `
+    ${pageHeader("Progress")}
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>My Trend</h2>
+        <select data-chart-metric>
+          ${METRICS.map((m) => `<option value="${m.key}">${m.label}</option>`).join("")}
+        </select>
+      </div>
+      <div data-chart>${chartFor(records, me.id, "weight")}</div>
+    </section>
+    <section class="panel" style="margin-top:18px">
+      <div class="panel-heading"><h2>History</h2><span>${records.length} records</span></div>
+      ${
+        records.length
+          ? `<div class="data-table">
+              <div class="table-head"><span>Date</span><span>Weight</span><span>BMI</span><span>Notes</span></div>
+              ${records
+                .map(
+                  (record) => `
+                    <div class="table-row" style="grid-template-columns:1fr 0.7fr 0.7fr 1.4fr">
+                      <span>${dateLabel(record.date)}</span>
+                      <span>${escapeHtml(record.weight || "-")}</span>
+                      <span>${escapeHtml(record.bmi || "-")}</span>
+                      <span><small>${escapeHtml(record.notes || "")}</small></span>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>`
+          : emptyState("No progress records", "Your gym hasn't recorded any measurements yet.")
+      }
+    </section>
+  `;
+}
+
+function bindMemberProgress(root, context) {
+  const me = context.myMember;
+  const metricSel = root.querySelector("[data-chart-metric]");
+  const chartBox = root.querySelector("[data-chart]");
+  if (!me || !metricSel || !chartBox) return;
+  metricSel.addEventListener("change", () => {
+    const records = (context.data.progress_records || []).filter((r) => r.memberId === me.id);
+    chartBox.innerHTML = chartFor(records, me.id, metricSel.value);
+  });
+}
 
 function chartFor(records, memberId, metricKey) {
   if (!memberId) return `<div class="table-empty">Select a member to see their trend.</div>`;

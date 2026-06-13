@@ -43,11 +43,11 @@ export const membershipsModule = {
       payload.durationDays = Number(payload.durationDays);
       payload.price = Number(payload.price);
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.plans, payload);
+        const saved = await context.services.data.save(collections.plans, payload);
         context.toast(payload.id ? "Plan updated." : "Plan added.");
         form.reset();
         root.querySelector(".panel-heading h2").textContent = "Add Plan";
-        await context.refresh();
+        context.applyChange(collections.plans, saved);
       });
     });
 
@@ -73,7 +73,7 @@ export const membershipsModule = {
         if (!ok) return;
         await context.services.data.remove(collections.plans, button.dataset.deletePlan);
         context.toast("Plan deleted.");
-        await context.refresh();
+        context.applyRemoval(collections.plans, button.dataset.deletePlan);
       });
     });
 

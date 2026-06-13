@@ -77,12 +77,12 @@ export const paymentsModule = {
       payload.amount = Number(payload.amount);
       payload.receiptNumber = payload.receiptNumber || `RCPT-${Date.now().toString().slice(-8)}`;
       await withButtonLoading(form.querySelector("[type='submit']"), async () => {
-        await context.services.data.save(collections.payments, payload);
+        const saved = await context.services.data.save(collections.payments, payload);
         context.toast("Payment saved.");
         form.reset();
         form.date.value = today();
         form.collectedBy.value = "Owner";
-        await context.refresh();
+        context.applyChange(collections.payments, saved);
       });
     });
 

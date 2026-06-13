@@ -5,38 +5,150 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function uid() {
+      return request.auth.uid;
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    function sameGym() {
-      return signedIn() && resource.data.gymId == userDoc().data.gymId;
+    function myGymId() {
+      return userDoc().data.gymId;
     }
 
-    function incomingSameGym() {
-      return signedIn() && request.resource.data.gymId == userDoc().data.gymId;
+    function myRole() {
+      return userDoc().data.role;
     }
 
     function owner() {
-      return signedIn() && userDoc().data.role == "owner";
+      return signedIn() && myRole() == "owner";
+    }
+
+    function sameGym() {
+      return signedIn() && resource.data.gymId == myGymId();
+    }
+
+    function incomingSameGym() {
+      return signedIn() && request.resource.data.gymId == myGymId();
+    }
+
+    // Public, single-doc lookup so a not-yet-registered member can resolve a
+    // gym code -> gymId. Listing is blocked to prevent harvesting all codes.
+    match /gym_codes/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.gymId == uid()
+        && request.resource.data.code == code;
+      allow update, delete: if false;
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || owner());
-      allow create: if signedIn() && request.auth.uid == userId;
+      allow read: if signedIn() && (uid() == userId || owner());
+      // Self-create only. Owner mints their own gym (gymId == their uid).
+      // Member joins an existing gym only if the code they used really maps to
+      // that gymId — this closes the "claim any gymId" hole.
+      allow create: if signedIn() && uid() == userId && (
+        (
+          request.resource.data.role == "owner"
+          && request.resource.data.gymId == userId
+        )
+        || (
+          request.resource.data.role == "member"
+          && exists(/databases/$(database)/documents/gym_codes/$(request.resource.data.gymCodeUsed))
+          && get(/databases/$(database)/documents/gym_codes/$(request.resource.data.gymCodeUsed)).data.gymId
+               == request.resource.data.gymId
+        )
+        || (
+          request.resource.data.role == "trainer"
+          && exists(/databases/$(database)/documents/gym_codes/$(request.resource.data.gymCodeUsed))
+          && get(/databases/$(database)/documents/gym_codes/$(request.resource.data.gymCodeUsed)).data.gymId
+               == request.resource.data.gymId
+        )
+      );
       allow update, delete: if owner();
     }
 
-    match /gym_settings/{docId} {
-      allow read: if sameGym();
-      allow create, update: if owner() && incomingSameGym();
+    // Per-gym settings (doc id == gymId). Fixes the old shared "profile" doc
+    // that let one gym overwrite another's settings.
+    match /gym_settings/{gymId} {
+      allow read: if signedIn() && myGymId() == gymId;
+      allow create, update: if owner()
+        && gymId == myGymId()
+        && request.resource.data.gymId == myGymId();
       allow delete: if false;
     }
 
+    // Roster. Owner manages freely; a self-registering member may create only
+    // their own Pending roster row (linked by uid).
+    match /members/{docId} {
+      allow read: if sameGym();
+      allow create: if incomingSameGym() && (
+        owner()
+        || (
+          myRole() == "member"
+          && request.resource.data.uid == uid()
+          && request.resource.data.status == "Pending"
+        )
+      );
+      allow update: if owner() && sameGym() && incomingSameGym();
+      allow delete: if owner() && sameGym();
+    }
+
+    // Attendance. Owner manages freely; a member may create check-ins only for
+    // their OWN roster row (the members doc whose uid matches the caller).
+    match /attendance/{docId} {
+      allow read: if sameGym();
+      allow create: if incomingSameGym() && (
+        owner()
+        || (
+          myRole() == "member"
+          && request.resource.data.gymId == myGymId()
+          && exists(/databases/$(database)/documents/members/$(request.resource.data.memberId))
+          && get(/databases/$(database)/documents/members/$(request.resource.data.memberId)).data.uid == uid()
+        )
+      );
+      allow update, delete: if owner() && sameGym();
+    }
+
+    // Trainer roster. Owner manages freely; a self-registering trainer may create
+    // only their own Pending roster row (linked by uid).
+    match /trainers/{docId} {
+      allow read: if sameGym();
+      allow create: if incomingSameGym() && (
+        owner()
+        || (
+          myRole() == "trainer"
+          && request.resource.data.uid == uid()
+          && request.resource.data.status == "Pending"
+        )
+      );
+      allow update: if owner() && sameGym() && incomingSameGym();
+      allow delete: if owner() && sameGym();
+    }
+
+    // Trainer self check-in. A trainer may create check-ins only for their OWN
+    // roster row (the trainers doc whose uid matches the caller).
+    match /trainer_attendance/{docId} {
+      allow read: if sameGym();
+      allow create: if incomingSameGym() && (
+        owner()
+        || (
+          myRole() == "trainer"
+          && request.resource.data.gymId == myGymId()
+          && exists(/databases/$(database)/documents/trainers/$(request.resource.data.trainerId))
+          && get(/databases/$(database)/documents/trainers/$(request.resource.data.trainerId)).data.uid == uid()
+        )
+      );
+      allow update, delete: if owner() && sameGym();
+    }
+
+    // Everything else (plans, payments, progress, workouts, reminders):
+    // same-gym read; owner-only writes.
     match /{collection}/{docId} {
       allow read: if sameGym();
-      allow create: if incomingSameGym();
-      allow update: if sameGym() && incomingSameGym();
+      allow create, update: if owner() && incomingSameGym();
       allow delete: if owner() && sameGym();
     }
   }

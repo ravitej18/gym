@@ -27,7 +27,7 @@ export const remindersModule = {
       button.addEventListener("click", async () => {
         const member = context.data.members.find((item) => item.id === button.dataset.reminderSent);
         if (!member) return;
-        await context.services.data.save(collections.reminders, {
+        const saved = await context.services.data.save(collections.reminders, {
           memberId: member.id,
           channel: "WhatsApp",
           state: "Sent",
@@ -35,7 +35,7 @@ export const remindersModule = {
           message: buildMessage(member, context.settings)
         });
         context.toast("Reminder marked as sent.");
-        await context.refresh();
+        context.applyChange(collections.reminders, saved);
       });
     });
   }
