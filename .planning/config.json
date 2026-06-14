@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "project": "GymFlow",
+  "workflow": {
+    "autoCommit": true,
+    "requireTests": false,
+    "requireReview": false,
+    "branchPerPhase": true,
+    "commitConvention": "conventional"
+  },
+  "agents": {
+    "profile": "balanced"
+  }
+}
