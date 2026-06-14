@@ -1,5 +1,24 @@
 window.GYM_CONFIG = {
   appName: "GymFlow",
+
+  // ─── Color Theme ──────────────────────────────────────────────────────────
+  // Choose one of the 10 available themes. Change this value to rebrand your gym.
+  // The theme is applied before the page renders (no flash).
+  //
+  // Available themes:
+  //   "neon-lime"      — Neon green + teal       (default, high-energy)
+  //   "electric-blue"  — Azure blue + emerald    (modern, tech-forward)
+  //   "fire-orange"    — Blaze orange + gold      (intense, bold)
+  //   "crimson-force"  — Power red + amber        (aggressive, sport)
+  //   "ultra-violet"   — Purple + indigo          (premium, futuristic)
+  //   "arctic-cyan"    — Cyan + mint              (cool, clean)
+  //   "solar-gold"     — Champion gold + orange   (achievement, prestige)
+  //   "plasma-pink"    — Hot pink + purple        (vibrant, energetic)
+  //   "matrix-green"   — Terminal green + teal    (hacker, tech)
+  //   "midnight-teal"  — Deep teal + indigo       (calm, focused)
+  //
+  colorTheme: "neon-lime",
+
   firebase: {
     apiKey: "YOUR_FIREBASE_API_KEY",
     authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -9,3 +28,12 @@ window.GYM_CONFIG = {
     appId: "YOUR_APP_ID"
   }
 };
+
+// Apply color theme immediately — runs synchronously in <head> so the browser
+// paints the correct theme on the very first frame (no FOUT/flash).
+(function () {
+  var t = window.GYM_CONFIG.colorTheme;
+  if (t && t !== "neon-lime") {
+    document.documentElement.setAttribute("data-color-theme", t);
+  }
+})();

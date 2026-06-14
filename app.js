@@ -18,6 +18,14 @@ import { trainerCheckinModule } from "./modules/trainer-checkin.js";
 
 const appRoot = document.querySelector("#app");
 
+// Apply saved theme before any render to prevent flash
+(function initTheme() {
+  const saved = localStorage.getItem("gf-theme");
+  if (saved === "dark" || saved === "light") {
+    document.documentElement.setAttribute("data-theme", saved);
+  }
+})();
+
 // 4th element = roles allowed to see this nav item / route. Defaults to owner+member.
 const ALL_ROLES = ["owner", "member"];
 const nav = [
@@ -255,7 +263,7 @@ function render() {
         ${visibleNav
           .map(
             ([key, label, icon]) => `
-              <a href="#/${key}" class="${key === currentNav[0] ? "active" : ""}">
+              <a href="#/${key}" class="${key === currentNav[0] ? "active" : ""}" data-label="${label}">
                 <span class="nav-icon">${iconSymbol(icon)}</span>
                 <span>${label}</span>
               </a>
@@ -275,27 +283,32 @@ function render() {
     </aside>
     <main class="workspace">
       <header class="topbar">
-        <button class="icon-button mobile-nav" data-action="toggle-nav" title="Menu">
+        <button class="icon-button mobile-nav" data-action="toggle-nav" aria-label="Open menu" title="Menu">
           <span class="material-symbols-outlined">menu</span>
         </button>
         <div class="topbar-search">
           <span class="material-symbols-outlined">search</span>
-          <input type="search" placeholder="Search members, payments..." aria-label="Search" />
+          <input type="search" placeholder="Search members, payments…" aria-label="Search" />
         </div>
         <div class="topbar-actions">
           <a class="pill-button" href="#/${state.profile.role === "trainer" ? "trainer-checkin" : "attendance"}">
-            <span class="material-symbols-outlined">login</span>Check-in
+            <span class="material-symbols-outlined">login</span><span>Check-in</span>
           </a>
           <div class="topbar-user">
             <span class="eyebrow">${state.profile.role}</span>
             <strong>${state.profile.name}</strong>
           </div>
+          <button class="theme-toggle" data-action="toggle-theme" aria-label="Toggle theme" title="Toggle dark/light mode">
+            <span class="material-symbols-outlined theme-icon-light">dark_mode</span>
+            <span class="material-symbols-outlined theme-icon-dark">light_mode</span>
+          </button>
           <button class="ghost-button" data-action="logout">Sign out</button>
         </div>
       </header>
       <section class="content-panel" id="view">${currentModule.render(makeContext())}</section>
     </main>
     <div class="toast ${state.toast ? "show" : ""}">${state.toast}</div>
+    <div class="nav-scrim" data-action="close-nav"></div>
   `;
 
   bindAppEvents();
@@ -347,6 +360,24 @@ function bindAppEvents() {
 
   document.querySelector("[data-action='toggle-nav']")?.addEventListener("click", () => {
     document.body.classList.toggle("nav-open");
+  });
+
+  document.querySelector("[data-action='close-nav']")?.addEventListener("click", () => {
+    document.body.classList.remove("nav-open");
+  });
+
+  // Close mobile nav when a nav link is clicked
+  document.querySelectorAll(".nav-list a").forEach((link) => {
+    link.addEventListener("click", () => {
+      document.body.classList.remove("nav-open");
+    });
+  });
+
+  document.querySelector("[data-action='toggle-theme']")?.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme") || "light";
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("gf-theme", next);
   });
 
   const topSearch = document.querySelector(".topbar-search input");

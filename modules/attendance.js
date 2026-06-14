@@ -31,18 +31,17 @@ export const attendanceModule = {
           <div class="panel-heading"><h2>Check In</h2></div>
           <div class="form-grid">
             <label>Member
-              <input
-                type="text"
-                data-member-search
-                list="checkin-member-options"
-                placeholder="Type to search members"
-                autocomplete="off"
-                required
-              />
+              <div class="ac-wrap">
+                <input
+                  type="text"
+                  data-member-search
+                  placeholder="Type to search members"
+                  autocomplete="off"
+                  required
+                />
+                <div class="ac-list" data-member-suggestions hidden></div>
+              </div>
               <input type="hidden" name="memberId" />
-              <datalist id="checkin-member-options">
-                ${members.map((member) => `<option data-id="${escapeHtml(member.id)}" value="${escapeHtml(member.fullName || member.id)}"></option>`).join("")}
-              </datalist>
             </label>
             <label>Date<input name="date" type="date" value="${todayStr}" required /></label>
             <label>Time<input name="time" type="time" value="${now.toTimeString().slice(0, 5)}" required /></label>
@@ -84,27 +83,54 @@ export const attendanceModule = {
     const form = root.querySelector("#attendance-form");
     const memberSearch = form.querySelector("[data-member-search]");
     const memberIdField = form.querySelector("[name='memberId']");
+    const suggestions = form.querySelector("[data-member-suggestions]");
 
-    // Resolve the typed member name -> member id; auto-fill the assigned trainer.
-    function resolveMember() {
-      const typed = memberSearch.value.trim().toLowerCase();
-      const member = (context.data.members || []).find(
-        (item) => (item.fullName || item.id || "").toLowerCase() === typed
-      );
-      memberIdField.value = member?.id || "";
-      // Pre-fill the trainer the member was assigned during onboarding (overridable).
-      if (member?.assignedTrainer) form.trainerId.value = member.assignedTrainer;
-      // Surface invalid typed text to native form validation.
-      memberSearch.setCustomValidity(memberIdField.value ? "" : "Pick a member from the list.");
+    function selectMember(member) {
+      memberSearch.value = member.fullName || member.id;
+      memberIdField.value = member.id;
+      memberSearch.setCustomValidity("");
+      if (member.assignedTrainer) form.trainerId.value = member.assignedTrainer;
+      suggestions.hidden = true;
     }
 
-    memberSearch.addEventListener("input", resolveMember);
-    memberSearch.addEventListener("change", resolveMember);
+    memberSearch.addEventListener("input", () => {
+      const typed = memberSearch.value.trim().toLowerCase();
+      memberIdField.value = "";
+      if (!typed) { suggestions.hidden = true; return; }
+      const matches = (context.data.members || []).filter((m) =>
+        (m.fullName || m.id || "").toLowerCase().includes(typed)
+      ).slice(0, 10);
+      if (!matches.length) { suggestions.hidden = true; return; }
+      suggestions.innerHTML = matches
+        .map((m) => `<div class="ac-item" data-id="${escapeHtml(m.id)}">${escapeHtml(m.fullName || m.id)}</div>`)
+        .join("");
+      suggestions.hidden = false;
+    });
+
+    suggestions.addEventListener("mousedown", (e) => {
+      const item = e.target.closest(".ac-item");
+      if (!item) return;
+      e.preventDefault(); // keep focus on input
+      const member = (context.data.members || []).find((m) => m.id === item.dataset.id);
+      if (member) selectMember(member);
+    });
+
+    memberSearch.addEventListener("blur", () => {
+      setTimeout(() => { suggestions.hidden = true; }, 150);
+      if (!memberIdField.value) {
+        memberSearch.setCustomValidity("Pick a member from the list.");
+      }
+    });
+
+    memberSearch.addEventListener("focus", () => {
+      memberSearch.setCustomValidity("");
+    });
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      resolveMember();
       if (!memberIdField.value) {
+        memberSearch.setCustomValidity("Pick a member from the list.");
+        memberSearch.reportValidity();
         memberSearch.reportValidity();
         return;
       }
