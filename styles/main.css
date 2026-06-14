@@ -632,6 +632,34 @@ small { color: var(--muted); font-size: 0.8rem; }
 /* ===== Forms ===== */
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 
+/* Autocomplete dropdown */
+.ac-wrap { position: relative; }
+.ac-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 300;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ac-item {
+  padding: 9px 14px;
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-out);
+}
+.ac-item:hover { background: var(--primary-fade); color: var(--ink); }
+
 label {
   display: grid;
   gap: 6px;
